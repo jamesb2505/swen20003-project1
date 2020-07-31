@@ -1,0 +1,52 @@
+Syntax:
+<Type>,<Arguments>
+
+Images:
+	Arguments:
+		imageSrc
+	Default:
+		imageSrc = none
+	For image source file.
+
+Types:
+	P = Player
+	G = Grass
+	W = Water
+	B = Bus
+ 
+Player: 
+	Arguments: 
+		x,y
+ 	Defaults: 
+  		x = 24
+  		y = 24
+	Sets the initial player location to x,y
+
+Grass: 
+	Arguments:
+		yStart,yEnd
+	Defaults: 
+		yStart = 24
+		yEnd = 24
+	Fills the width of the screen with grass tiles in range [yStart, yEnd]
+ 
+Water: 
+	Arguments:
+		yStart,yEnd
+	Defaults: 
+		yStart = 24
+		yEnd = 24
+	Fills the width of the screen with water tiles in range [yStart, yEnd]
+ 
+Bus: 
+	Arguments:
+		offset,y,separation,speed
+	Defaults: 
+		offset = 23
+		y = 24
+		separation = 98
+		speed = 0.15
+	Fills a row of busses at y
+	Offset denotes the first bus x-coordinate
+	Separation denotes the spacing in tiles between busses
+	Speed denotes the speed of the row of busses in pixels/ms

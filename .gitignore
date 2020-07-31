@@ -1,0 +1,7 @@
+2018-*/
+*.zip
+.project
+.classpath
+.settings/
+/bin
+*.pdf

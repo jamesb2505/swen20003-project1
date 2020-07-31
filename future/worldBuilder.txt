@@ -1,0 +1,231 @@
+import java.util.*;
+
+import java.io.*;
+
+import org.newdawn.slick.*;
+
+public class World {
+	public static final int TILE_WIDTH = 48;
+	public static final int TILE_HEIGHT = 48;
+	
+	public static final String SEPARATOR = ",";
+
+	public static final String PLAYER = "P";
+	public static final String GRASS = "G";
+	public static final String WATER = "W";
+	public static final String BUS = "B";
+	public static final float DEFAULT_X = TILE_WIDTH / 2;
+	public static final float DEFAULT_Y = TILE_HEIGHT / 2;
+	public static final float DEFAULT_SEPARATION = 2;
+	public static final float DEFAULT_SPEED = 0.15F;
+
+	/** stores all Images for each Sprite type. To save memory */
+	private HashMap<String, Image> images;
+	/** stores all Sprites in the World, excluding Player */
+	private ArrayList<Sprite> sprites;
+	/** Player Sprite in World */
+	private Player player;
+	
+	/** Constructs a World
+	 * @param imagesSrc Path of csv file containing the paths of Sprite's images. For format, see assets/syntax.txt
+	 * @param worldSrc Path of csv file encoding how the World is to be created. For format, see assets/syntax.txt
+	 * @throws SlickException
+	 */
+	public World(String imagesSrc, String worldSrc) 
+			throws SlickException {
+		// Perform initialisation logic
+		images = new HashMap<String, Image>();
+		sprites = new ArrayList<Sprite>();
+		
+		try (BufferedReader imageBR = new BufferedReader(new FileReader(imagesSrc));
+				BufferedReader worldBR = new BufferedReader(new FileReader(worldSrc))) {
+			String line, type, data[];
+			// read image data
+			while ((line = imageBR.readLine()) != null) {
+				// check that the line contains data
+				if (line.indexOf(SEPARATOR) > 0) {
+					data = line.split(SEPARATOR);
+					parseImage(data);
+				}
+			}
+			// read world data
+			while ((line = worldBR.readLine()) != null) {
+				int index = line.indexOf(SEPARATOR);
+				// check that the line contains data
+				if (index > 0) {
+					// extract type and data
+					type = line.substring(0, index);
+					data = line.substring(index + 1).split(SEPARATOR);
+					
+					// check image exists
+					if (!images.containsKey(type)) {
+						System.err.format("Missing image source for type %s\n", type);
+						System.exit(1);
+					}
+					switch (type) {
+					case PLAYER:
+						parsePlayer(data);
+						break;
+					case WATER:
+					case GRASS:
+						parseTiles(data, type);
+						break;
+					case BUS:
+						parseBusLane(data);
+						break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/** Updates all Sprites in the World
+     * @param input The Slick input object.
+     * @param delta Time passed since last frame (milliseconds).
+     */
+	public void update(Input input, int delta) {
+		// Update all of the sprites in the game
+		for (Sprite sprite : sprites) {
+			sprite.update(input, delta);
+			sprite.contactSprite(player);
+		}
+		player.update(input, delta);
+	}
+	
+	/** Renders all Sprites in the World
+     * @param g The Slick Graphics object.
+     */
+	public void render(Graphics g) {
+		for (Sprite sprite : sprites) {
+			sprite.render();
+		}
+		player.render();
+	}
+	
+	/** Parses input String[], adds Image to images
+     * @param input String[] to be parsed. For format, see assets/syntax.txt
+	 * @throws SlickException 
+     */
+	private void parseImage(String[] input) 
+			throws SlickException {
+		if (input.length == 2 && !input[0].isEmpty()) {
+			String type = input[0];
+			String src = input[1];
+			
+			switch (type) {
+			case PLAYER:
+			case GRASS:
+			case WATER:
+			case BUS:
+				images.put(type, new Image(src));
+				break;
+			default:
+				System.err.format("Unrecognized type: %s", type);
+			}
+		}
+	}
+	
+	/** Parses input String[], then generates a row of busses based on input
+     * @param input String to be parsed. For format, see assets/syntax.txt
+     */
+	private void parseBusLane(String input[]) {
+		float offset = DEFAULT_X;
+		float y = DEFAULT_Y;
+		float separation = DEFAULT_SEPARATION;
+		float speed = DEFAULT_SPEED;
+		
+		// read in however many values were contained in input
+		if (input.length > 0 && input.length <= 4 && !input[0].isEmpty()) {
+			switch (input.length) {
+			case 4:
+				speed = Float.parseFloat(input[3]);
+			case 3:
+				separation = Float.parseFloat(input[2]);
+			case 2:
+				y = Float.parseFloat(input[1]);
+			case 1:
+				offset = Float.parseFloat(input[0]);
+				break;
+			}
+		}
+		addBusLane(offset, y, separation, speed);
+	}
+	
+	/** Parses input String, then generates a row of Tiles based on input
+     * @param input String. For format, see assets/syntax.txt
+     * @param type Type of tile to be generated
+     */
+	private void parseTiles(String input[], String type) {
+		float yStart = DEFAULT_Y;
+		float yEnd = DEFAULT_Y;
+
+		// read in however many values were contained in input
+		if (input.length > 0 && input.length <= 2 && !input[0].isEmpty()) {
+			switch (input.length) {
+			case 2:
+				yStart = Float.parseFloat(input[0]);
+				yEnd = Float.parseFloat(input[1]);
+				break;
+			case 1:
+				yStart = yEnd = Float.parseFloat(input[0]);
+				break; 
+			}
+		}
+		addTiles(yStart, yEnd, type);
+	}
+	
+	/** Parses input String, then makes a new Player based on input
+     * @param data String. For format, see assets/syntax.txt
+     */
+	private void parsePlayer(String[] data) {
+		float x = DEFAULT_X;
+		float y = DEFAULT_Y;
+
+		// read in however many values were contained in input
+		if (data.length > 0 && data.length <= 2 && !data[0].isEmpty()) {
+			switch (data.length) {
+			case 2:
+				y = Float.parseFloat(data[1]);
+			case 1:
+				x = Float.parseFloat(data[0]);
+				break; 
+			}
+		}
+		
+		player = new Player(images.get(PLAYER), x, y);
+	}
+	
+	/** Adds a lane of Buses into the World
+	 * @param offset x coordinate of first Bus
+	 * @param y y coordinate of Bus lane
+	 * @param separation distance between Buses in lane
+	 * @param speed speed of Buses in the lane
+	 */
+	private void addBusLane(float offset, float y, float separation, float speed) {
+		Image image = images.get(BUS);
+		// fill in as many buses we can 
+		for (float x = offset; x < App.SCREEN_WIDTH + TILE_WIDTH / 2; x += separation * TILE_WIDTH) {
+			sprites.add(new Bus(image, x, y, speed));
+		}
+	}
+	
+	/** Adds rows of tiles to the World
+	 * @param yStart y coordinate of the first row tiles
+	 * @param yEnd y coordinate of the last row of tiles
+	 * @param type GRASS or WATER
+	 */
+	private void addTiles(float yStart, float yEnd, String type) {
+		Image image = images.get(type);
+
+		// fill in as many tiles we can 
+		for (float y = yStart; y <= yEnd; y += TILE_HEIGHT) {
+			// fill screen width
+			for (float x = TILE_WIDTH / 2; x < App.SCREEN_WIDTH + TILE_WIDTH / 2; x += TILE_WIDTH) {
+				sprites.add(type.equals(GRASS) ? new Grass(image, x, y)
+											   : new Water(image, x, y));
+			}
+		}
+	}
+}
